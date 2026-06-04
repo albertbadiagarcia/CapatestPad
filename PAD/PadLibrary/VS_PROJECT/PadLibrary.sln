@@ -1,0 +1,31 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27130.2036
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Capatest.Pad", "PAD\PadLibrary.csproj", "{44394770-17C4-436C-9682-20CE2C9C0F48}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Capatest.Pad.Tests", "PadLibrary.Tests\PadLibrary.Tests.csproj", "{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{44394770-17C4-436C-9682-20CE2C9C0F48}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44394770-17C4-436C-9682-20CE2C9C0F48}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44394770-17C4-436C-9682-20CE2C9C0F48}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44394770-17C4-436C-9682-20CE2C9C0F48}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1A2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {14441C70-F4B6-4431-BA6D-B253533ED65E}
+	EndGlobalSection
+EndGlobal
