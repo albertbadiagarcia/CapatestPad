@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -319,6 +320,32 @@ namespace Capatest.Pad
                 Log(Log_Level.Error, ex.Message);
             }
         }
+
+        #region Load Cell Calibration
+
+        public void LoadCellZero(int channel, int raw)
+        {
+            uint raw24 = (uint)raw & 0x00FFFFFF;
+            Transport.Send(_rtx2Protocol.BuildNvsSetU32($"tare_{channel}_0", raw24));
+        }
+
+        public void LoadCellPercent(int channel, int percent, int raw)
+        {
+            percent = Math.Min(100, Math.Max(1, percent));
+
+            uint raw24 = (uint)raw & 0x00FFFFFF;
+            uint packed = ((uint)percent << 24) | raw24;
+
+            Transport.Send(_rtx2Protocol.BuildNvsSetU32($"tare_{channel}_1", packed));
+        }
+
+        public void LoadCellClear(int channel)
+        {
+            Transport.Send(_rtx2Protocol.BuildNvsDel($"tare_{channel}_0"));
+            Transport.Send(_rtx2Protocol.BuildNvsDel($"tare_{channel}_1"));
+        }
+
+        #endregion Load Cell Calibration
 
         public void SetWatchdog(int seconds)
         {
