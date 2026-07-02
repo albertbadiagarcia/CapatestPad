@@ -18,6 +18,8 @@ namespace Capatest.Pad
         private volatile bool _passiveReceiveStopping;
         private volatile bool _pollingStopRequested = true;
         private Func<byte[]> _commandFactory;
+        private readonly System.Collections.Generic.List<byte> _rxBuffer = new System.Collections.Generic.List<byte>();
+        private const int MaxRxBuffer = 8192;
 
         public string Address { get; set; } = "192.168.1.170";
         public int Port { get; set; } = 1999;
@@ -41,6 +43,7 @@ namespace Capatest.Pad
             try
             {
                 _commandFactory = commandFactory;
+                _rxBuffer.Clear();
                 TcpClient freshClient = new TcpClient();
                 lock (_socketLock)
                 {
@@ -122,6 +125,7 @@ namespace Capatest.Pad
             }
             try
             {
+                // Log(Log_Level.Raw, "TXSEND " + BitConverter.ToString(command));
                 lock (_socketLock)
                 {
                     if (!IsConnected())
@@ -196,9 +200,7 @@ namespace Capatest.Pad
                     }
                     if (received > 0)
                     {
-                        byte[] frame = new byte[received];
-                        Array.Copy(_buffer, frame, received);
-                        FrameReceived?.Invoke(frame);
+                        IngestAndEmit(_buffer, received);
                     }
                 }
                 catch (Exception ex)
@@ -231,6 +233,81 @@ namespace Capatest.Pad
             }
         }
 
+
+        // Reassemble the TCP byte stream into discrete binary protocol frames
+        // (STX + ADDR(2) + LEN(2) + payload + XOR + ETX). A single socket Receive
+        // may carry several frames concatenated or split one frame across reads —
+        // especially while the device streams continuously — so bytes are buffered
+        // across reads and only complete, ETX-terminated frames are emitted. This
+        // replaces the previous assumption that every Receive() returned exactly
+        // one frame, which desynchronised under continuous streaming and produced
+        // corrupted status data (e.g. flickering relay states).
+        private void IngestAndEmit(byte[] data, int length)
+        {
+            // Log(Log_Level.Raw, "RXRECV " + BitConverter.ToString(data, 0, length));
+
+            for (int i = 0; i < length; i++)
+            {
+                _rxBuffer.Add(data[i]);
+            }
+            if (_rxBuffer.Count > MaxRxBuffer)
+            {
+                _rxBuffer.RemoveRange(0, _rxBuffer.Count - MaxRxBuffer);
+            }
+
+            while (true)
+            {
+                // Resync to the next frame start (STX = 0x01 for Pad837, 0x02 otherwise).
+                int start = -1;
+                for (int i = 0; i < _rxBuffer.Count; i++)
+                {
+                    if (_rxBuffer[i] == 0x01 || _rxBuffer[i] == 0x02)
+                    {
+                        start = i;
+                        break;
+                    }
+                }
+                if (start < 0)
+                {
+                    _rxBuffer.Clear();
+                    return;
+                }
+                if (start > 0)
+                {
+                    _rxBuffer.RemoveRange(0, start);
+                }
+
+                if (_rxBuffer.Count < 5)
+                {
+                    return;  // need the 5-byte header to know the length
+                }
+
+                byte stx = _rxBuffer[0];
+                int payloadLength = stx == 0x01
+                    ? (_rxBuffer[3] << 8) | _rxBuffer[4]
+                    : (_rxBuffer[2] << 8) | _rxBuffer[3];
+                int totalLength = 5 + payloadLength + 2;  // header + payload + XOR + ETX
+
+                if (payloadLength <= 0 || totalLength > MaxRxBuffer)
+                {
+                    _rxBuffer.RemoveAt(0);  // bogus header (false STX), resync
+                    continue;
+                }
+                if (_rxBuffer.Count < totalLength)
+                {
+                    return;  // wait for the rest of the frame
+                }
+                if (_rxBuffer[totalLength - 1] != 0x04)
+                {
+                    _rxBuffer.RemoveAt(0);  // not a real frame boundary, resync
+                    continue;
+                }
+
+                byte[] frame = _rxBuffer.GetRange(0, totalLength).ToArray();
+                _rxBuffer.RemoveRange(0, totalLength);
+                FrameReceived?.Invoke(frame);
+            }
+        }
 
         public void StartPassiveReceive()
         {
@@ -267,9 +344,7 @@ namespace Capatest.Pad
                     int received = _tcpClient.Client.Receive(buf);
                     if (received > 0)
                     {
-                        byte[] frame = new byte[received];
-                        Array.Copy(buf, frame, received);
-                        FrameReceived?.Invoke(frame);
+                        IngestAndEmit(buf, received);
                     }
                 }
                 catch (SocketException ex) when (!_passiveReceiveStopping && ex.SocketErrorCode == SocketError.TimedOut)

@@ -87,7 +87,7 @@ namespace Capatest.Pad
             _relayController = new RelayController(protocol.RelayCount);
 
             _reconnectionManager = new ReconnectionManager(
-                connectAction: () => Connect(_countersMode, _statusFrequency),
+                connectAction: () => Connect(_countersMode, _statusFrequency, _counterPeriodCount),
                 deinitializeAction: Deinitialize,
                 updateStatus: NotifyStatus,
                 isConnected: () => _transport.IsConnected(),
@@ -162,7 +162,7 @@ namespace Capatest.Pad
         }
 
 
-        public bool Connect(Counters_Mode counterMode, int statusFrequency = 250)
+        public bool Connect(Counters_Mode counterMode, int statusFrequency = 250, int counterPeriodCount = 250)
         {
             try
             {
@@ -171,7 +171,11 @@ namespace Capatest.Pad
 
                 _countersMode = counterMode;
                 _statusFrequency = statusFrequency;
-                if (_counterPeriodCount <= 0)
+                if (counterPeriodCount > 0)
+                {
+                    _counterPeriodCount = counterPeriodCount;
+                }
+                else if (_counterPeriodCount <= 0)
                 {
                     _counterPeriodCount = statusFrequency;
                 }
@@ -183,12 +187,12 @@ namespace Capatest.Pad
 
                 if (connected)
                 {
+                    _transport.StartPolling();
                     byte[] cfgCmd = _protocol.BuildConfigureCounters(counterMode, _counterPeriodCount);
                     if (cfgCmd.Length > 0)
                     {
                         _transport.Send(cfgCmd);
                     }
-                    _transport.StartPolling();
                 }
 
                 return connected;

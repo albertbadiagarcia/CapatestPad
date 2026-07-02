@@ -177,11 +177,17 @@ namespace Capatest.Pad
 
         public byte[] BuildStopAutoStatus()
         {
-            byte[] cmd = new byte[8];
-            Array.Copy(new byte[] { Stx, 0, 0, 0x01, 0 }, cmd, 5);
+            // Auto-status command 0x0A carries an ON/OFF value byte (1 = on, 0 = off),
+            // exactly like BuildStartAutoStatus. The previous version declared len = 1
+            // and omitted the value byte, so the firmware read the checksum byte as the
+            // value (= 0x0A, non-zero) and kept streaming — auto-status could never be
+            // turned off from software. Send command 0x0A with value 0x00.
+            byte[] cmd = new byte[9];
+            Array.Copy(new byte[] { Stx, 0, 0, 0x02, 0x00 }, cmd, 5);
             cmd[5] = 0x0A;
-            cmd[6] = (byte)(CheckSum(1, new byte[] { cmd[5] }) & 0xFF);
-            cmd[7] = 0x04;
+            cmd[6] = 0x00;
+            cmd[7] = (byte)(CheckSum(2, new byte[] { cmd[5], cmd[6] }) & 0xFF);
+            cmd[8] = 0x04;
             return cmd;
         }
 

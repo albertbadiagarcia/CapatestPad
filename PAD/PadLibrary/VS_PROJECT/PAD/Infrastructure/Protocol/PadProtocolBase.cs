@@ -26,10 +26,15 @@ namespace Capatest.Pad
 
         protected static short CheckSum(int size, byte[] data)
         {
+            // XOR-based LRC, matching the legacy PAD_Library (Pad_Communication.cs
+            // CheckSum_Calculate) that the firmware was built against. An additive
+            // sum diverges from this whenever bytes share set bits, and can overflow
+            // a byte boundary to exactly 0x00 for specific payloads (e.g. periodCount
+            // = 250 in BuildConfigureCounters), which the firmware mishandles.
             short checksum = 0;
             for (int i = 0; i < size; i++)
             {
-                checksum += data[i];
+                checksum ^= data[i];
             }
             return checksum;
         }

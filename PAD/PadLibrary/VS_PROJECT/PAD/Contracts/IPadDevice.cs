@@ -27,7 +27,7 @@ namespace Capatest.Pad
         event WrongPADModelEventHandler WrongModelDetected;
         event PADLogEventHandler LogChanged;
 
-        bool Connect(Counters_Mode counterMode, int statusFrequency = 250);
+        bool Connect(Counters_Mode counterMode, int statusFrequency = 250, int counterPeriodCount = 250);
         bool Disconnect();
         bool IsConnected();
         void SetStatusRequestInterval(int ms);
