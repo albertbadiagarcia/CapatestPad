@@ -10,17 +10,18 @@ namespace Capatest.Pad
     {
         private TcpListener _listener;
         private Thread _listenThread;
-        private Thread _clientThread;
         private TcpClient _client;
         private volatile bool _stopping;
         private int _frameSize;
+        private int _readTimeoutMs = 5000;
 
         public int Channels { get; set; } = 1;
         public event Action<List<List<double>>> DataReceived;
 
-        public void Configure(IPAddress ip, int port, int bufferSizePerChannel)
+        public void Configure(IPAddress ip, int port, int bufferSizePerChannel, int readTimeoutMs)
         {
             _frameSize = bufferSizePerChannel * Channels * 2;  // 2 bytes per sample
+            _readTimeoutMs = readTimeoutMs;
             _listener = new TcpListener(ip, port);
         }
 
@@ -43,11 +44,9 @@ namespace Capatest.Pad
                 _listener?.Stop();
                 _client?.Close();
                 _listenThread?.Join(TimeSpan.FromSeconds(1));
-                _clientThread?.Join(TimeSpan.FromSeconds(1));
                 _listener = null;
                 _client = null;
                 _listenThread = null;
-                _clientThread = null;
                 return true;
             }
             catch (Exception ex)
@@ -62,9 +61,11 @@ namespace Capatest.Pad
             try
             {
                 _listener.Start();
-                _client = _listener.AcceptTcpClient();
-                _clientThread = new Thread(() => HandleClient(_client)) { IsBackground = true };
-                _clientThread.Start();
+                while (!_stopping)
+                {
+                    _client = _listener.AcceptTcpClient();
+                    HandleClient(_client);
+                }
             }
             catch (Exception ex)
             {
@@ -80,7 +81,7 @@ namespace Capatest.Pad
             try
             {
                 NetworkStream stream = client.GetStream();
-                stream.ReadTimeout = 1000;
+                stream.ReadTimeout = _readTimeoutMs;
                 byte[] buffer = new byte[Math.Max(_frameSize, 1)];
 
                 while (!_stopping)

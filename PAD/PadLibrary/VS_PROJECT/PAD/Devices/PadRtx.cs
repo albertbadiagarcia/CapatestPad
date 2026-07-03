@@ -110,11 +110,14 @@ namespace Capatest.Pad
                 byte[] cmd = _rtxProtocol.BuildOpenFastAcquisition(
                     frequency, samples, channels, bufferSize, socketType, port, localIp);
 
+                int bufferPeriodMs = (int)((long)bufferSize * 1000 / frequency);
+                int readTimeoutMs = Math.Max(5000, 3 * bufferPeriodMs);
+
                 switch (socketType)
                 {
                     case Socket_Type.TCP:
                         _tcpDataServer.Channels = channels;
-                        _tcpDataServer.Configure(IPAddress.Parse(localIp), port, bufferSize);
+                        _tcpDataServer.Configure(IPAddress.Parse(localIp), port, bufferSize, readTimeoutMs);
                         _tcpDataServer.DataReceived -= OnFastAcquisitionData;
                         _tcpDataServer.DataReceived += OnFastAcquisitionData;
                         _tcpDataServer.Start();
@@ -128,6 +131,7 @@ namespace Capatest.Pad
                         break;
                 }
 
+                Transport.StopPolling();
                 Transport.Send(cmd);
                 IsFastAdcRunning = true;
                 return true;
@@ -147,6 +151,7 @@ namespace Capatest.Pad
                 _tcpDataServer.Stop();
                 _udpReceiver.Stop();
                 IsFastAdcRunning = false;
+                Transport.StartPolling();
             }
             catch (Exception ex)
             {
