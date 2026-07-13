@@ -497,6 +497,18 @@ namespace Capatest.Pad
             SetLed(0, 0, 0);
         }
 
+        public void SetLedCycle()
+        {
+            try
+            {
+                Transport.Send(_rtx2Protocol.BuildLedCycle());
+            }
+            catch (Exception ex)
+            {
+                Log(Log_Level.Error, ex.Message);
+            }
+        }
+
         public void StartFastAdc(int frequencyHz, int samples = -1)
         {
             try

@@ -160,7 +160,16 @@ namespace Capatest.Pad
 
         public byte[] BuildChangeLed(byte r, byte g, byte b, Led_Blink_Modes blinkMode)
         {
+            // Note: the RTX2 firmware 'led rgb' command only accepts the three
+            // colour components and has no blink parameter, so blinkMode is
+            // intentionally ignored here. The only animated mode the firmware
+            // exposes is the colour cycle, available through BuildLedCycle().
             return Ascii($"led rgb {r} {g} {b}\r\n");
+        }
+
+        public byte[] BuildLedCycle()
+        {
+            return Ascii("led cycle\r\n");
         }
 
         public byte[] BuildChangeIp(string ip, int port, int mac1, int mac2)
