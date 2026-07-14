@@ -21,6 +21,10 @@ namespace Capatest.Pad
         private readonly object _nvsListLock = new object();
         private List<NvsEntry> _nvsListBuffer;
 
+        // NVS key under which the firmware stores the accumulated service time (time in use).
+        // Raw u32 value; unit (seconds/minutes) to be confirmed with the firmware.
+        public const string ServiceTimeNvsKey = "service_time";
+
         public IReadOnlyList<WeightReading> WeightReadings
         {
             get { return _weightReadings; }
@@ -36,6 +40,14 @@ namespace Capatest.Pad
         public event Action<string> VersionReceived;
         public event Action<string, uint?> NvsValueReceived;
         public event Action<IReadOnlyList<NvsEntry>> NvsListReceived;
+
+        // Raised when the service-time value (see ServiceTimeNvsKey) is received after a QueryServiceTime() call.
+        // The uint carries the raw NVS value (unit to be confirmed with the firmware).
+        public event Action<uint> ServiceTimeReceived;
+
+        // Raised when the firmware uptime is received after a QueryUptime() call. The uint carries
+        // milliseconds since boot (firmware u32; wraps around every ~49.7 days).
+        public event Action<uint> UptimeReceived;
 
         public PadRtx2(string portName, int baudRate = 115200)
             : this(new SerialTransport { Address = portName, Port = baudRate }, new PadRtx2Protocol()) { }
@@ -186,13 +198,21 @@ namespace Capatest.Pad
             {
                 if (_nvsListBuffer != null)
                 {
-                    string k;
-                    uint? v;
-                    if (_rtx2Protocol.TryParseNvsLine(line, out k, out v))
+                    // Skip the command echo ("capatest> nvs list") and the "key type len seq" header
+                    // that precede the entries.
+                    if (_rtx2Protocol.IsNvsListHeader(line) ||
+                        line.IndexOf("nvs list", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        _nvsListBuffer.Add(new NvsEntry(k, v));
                         return;
                     }
+                    string entryKey;
+                    if (_rtx2Protocol.TryParseNvsListEntry(line, out entryKey))
+                    {
+                        // The listing carries no value, only key/type/len/seq.
+                        _nvsListBuffer.Add(new NvsEntry(entryKey, null));
+                        return;
+                    }
+                    // Any other line (e.g. the "keys: N" footer) terminates the listing.
                     completedList = _nvsListBuffer.AsReadOnly();
                     _nvsListBuffer = null;
                 }
@@ -210,11 +230,22 @@ namespace Capatest.Pad
                 return;
             }
 
+            uint uptimeMs;
+            if (_rtx2Protocol.TryParseUptimeLine(line, out uptimeMs))
+            {
+                UptimeReceived?.Invoke(uptimeMs);
+                return;
+            }
+
             string nvsKey;
             uint? nvsValue;
             if (_rtx2Protocol.TryParseNvsLine(line, out nvsKey, out nvsValue))
             {
                 NvsValueReceived?.Invoke(nvsKey, nvsValue);
+                if (nvsValue.HasValue && string.Equals(nvsKey, ServiceTimeNvsKey, StringComparison.Ordinal))
+                {
+                    ServiceTimeReceived?.Invoke(nvsValue.Value);
+                }
                 return;
             }
 
@@ -254,6 +285,28 @@ namespace Capatest.Pad
             try
             {
                 Transport.Send(_rtx2Protocol.BuildVersion());
+            }
+            catch (Exception ex)
+            {
+                Log(Log_Level.Error, ex.Message);
+            }
+        }
+
+        // Requests the accumulated service time (time in use) the firmware keeps in NVS.
+        // The result arrives asynchronously through the ServiceTimeReceived event
+        // (and also through the generic NvsValueReceived event, keyed by ServiceTimeNvsKey).
+        public void QueryServiceTime()
+        {
+            NvsGet(ServiceTimeNvsKey);
+        }
+
+        // Requests the firmware uptime (milliseconds since boot). The result arrives
+        // asynchronously through the UptimeReceived event.
+        public void QueryUptime()
+        {
+            try
+            {
+                Transport.Send(_rtx2Protocol.BuildUptime());
             }
             catch (Exception ex)
             {

@@ -24,6 +24,21 @@ namespace Capatest.Pad
             @"^([A-Za-z0-9_]+):\s+len=\d+(?:\s+u32=(\d+))?",
             RegexOptions.Compiled);
 
+        private static readonly Regex UptimeLineRx = new Regex(
+            @"^uptime:\s+(\d+)\s*ms",
+            RegexOptions.Compiled);
+
+        // 'nvs list' table header: "key type len seq".
+        private static readonly Regex NvsListHeaderRx = new Regex(
+            @"^key\s+type\s+len\s+seq\s*$",
+            RegexOptions.Compiled);
+
+        // 'nvs list' entry row, e.g. "service_time u32 4 5327" (key type len seq).
+        // The row carries no value; the trailing number is the NVS sequence, not the u32 value.
+        private static readonly Regex NvsListEntryRx = new Regex(
+            @"^([A-Za-z0-9_]+)\s+(u8|i8|u16|i16|u32|i32|u64|i64|str|blob)\s+\d+\s+\d+\s*$",
+            RegexOptions.Compiled);
+
         public PAD_Models Model
         {
             get { return PAD_Models.PadRTX2; }
@@ -387,6 +402,11 @@ namespace Capatest.Pad
             return Ascii("version\r\n");
         }
 
+        public byte[] BuildUptime()
+        {
+            return Ascii("uptime\r\n");
+        }
+
         public byte[] BuildNvsGet(string key)
         {
             return Ascii($"nvs get {key}\r\n");
@@ -420,6 +440,46 @@ namespace Capatest.Pad
                 return false;
             }
             version = m.Groups[1].Value.Trim();
+            return true;
+        }
+
+        public bool TryParseUptimeLine(string line, out uint uptimeMs)
+        {
+            uptimeMs = 0;
+            if (line == null)
+            {
+                return false;
+            }
+            Match m = UptimeLineRx.Match(line);
+            if (!m.Success)
+            {
+                return false;
+            }
+            return uint.TryParse(m.Groups[1].Value, out uptimeMs);
+        }
+
+        public bool IsNvsListHeader(string line)
+        {
+            if (line == null)
+            {
+                return false;
+            }
+            return NvsListHeaderRx.IsMatch(line);
+        }
+
+        public bool TryParseNvsListEntry(string line, out string key)
+        {
+            key = null;
+            if (line == null)
+            {
+                return false;
+            }
+            Match m = NvsListEntryRx.Match(line);
+            if (!m.Success)
+            {
+                return false;
+            }
+            key = m.Groups[1].Value;
             return true;
         }
 
