@@ -30,6 +30,7 @@ namespace Capatest.Pad
         public event PADWorkingModeChangedEventHandler WorkingModeChanged;
         public event Action<byte[]> FrameReceived;
         public event PADLogEventHandler LogChanged;
+        public string LocalIP { get; private set; } = string.Empty;
 
         public TcpTransport()
         {
@@ -66,6 +67,7 @@ namespace Capatest.Pad
                     return false;
                 }
 
+                LocalIP = ((IPEndPoint)_tcpClient.Client.LocalEndPoint).Address.ToString();
                 _tcpClient.Client.SendTimeout = 2000;
                 _tcpClient.Client.ReceiveTimeout = 2000;
                 _tcpClient.SendTimeout = 2000;

@@ -101,10 +101,21 @@ namespace Capatest.Pad
                 {
                     return false;
                 }
-
                 if (string.IsNullOrEmpty(localIp))
                 {
-                    localIp = GetLocalIp();
+                    if (Transport is TcpTransport)
+                    {
+                        localIp = ((TcpTransport)Transport).LocalIP;
+
+                        if (string.IsNullOrEmpty(localIp))
+                        {
+                            localIp = GetLocalIp();
+                        }
+                    }
+                    else    
+                    {
+                        localIp = GetLocalIp();
+                    }
                 }
 
                 byte[] cmd = _rtxProtocol.BuildOpenFastAcquisition(
